@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RESOLVE Decision Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an app shell — alert strip, impact tally, a shelf of stored items; one item opens a decision panel with a "stage" where the outcome plays out. */
+:root{
+  --bg:#EEF0EC; --surface:#F8F9F6; --sunk:#E3E7E1; --ink:#1E2420; --muted:#5C6660; --line:#D2D8D1;
+  --accent:#8F7139; --accent-soft:#E9DFC9; --on-accent:#FFFDF7;
+  --warn:#A8701A; --warn-soft:#F3E5C8; --crit:#A8382C; --crit-soft:#F2D9D4; --ok:#3B7553; --ok-soft:#D6E8DC;
+  --wood:#A9744A; --plastic:#5F86AD; --aluminium:#8E979F; --iron:#5F5852; --glass:#62A8A3; --fabric:#AD6F8A;
+  --f-display:"Cormorant Garamond","Iowan Old Style",Georgia,serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131714; --surface:#1B201C; --sunk:#101411; --ink:#E6EAE4; --muted:#9AA49C; --line:#2D342F;
+  --accent:#CDAE6D; --accent-soft:#3A3222; --on-accent:#1A1609;
+  --warn:#E3A74E; --warn-soft:#3B2E17; --crit:#E8786A; --crit-soft:#3E1F1B; --ok:#73BE90; --ok-soft:#1D3326;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131714; --surface:#1B201C; --sunk:#101411; --ink:#E6EAE4; --muted:#9AA49C; --line:#2D342F;
+  --accent:#CDAE6D; --accent-soft:#3A3222; --on-accent:#1A1609;
+  --warn:#E3A74E; --warn-soft:#3B2E17; --crit:#E8786A; --crit-soft:#3E1F1B; --ok:#73BE90; --ok-soft:#1D3326;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.5;padding:0 16px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;display:grid;gap:20px}
+h1,h2,h3{margin:0;text-wrap:balance}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.wordmark{font-family:var(--f-display);font-weight:600;font-size:30px;letter-spacing:.2em}
+.brand .sub{color:var(--muted);font-size:13px}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* alert */
+.alert{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:var(--r);padding:16px 18px}
+.bell{width:38px;height:38px;border-radius:50%;background:var(--warn-soft);color:var(--warn);display:grid;place-items:center}
+.bell svg{animation:ring 2.4s ease-in-out infinite;transform-origin:50% 10%}
+@keyframes ring{0%,80%,100%{transform:rotate(0)}84%{transform:rotate(14deg)}88%{transform:rotate(-12deg)}92%{transform:rotate(8deg)}96%{transform:rotate(-4deg)}}
+.alert h2{font-family:var(--f-body);font-size:16px;font-weight:600}
+.alert p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.btn-primary{background:var(--accent);color:var(--on-accent);border:0;border-radius:999px;padding:10px 18px;font-weight:600;font-size:14px}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+
+/* tally */
+.tally{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tally div{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
+.tally b{font-family:var(--f-mono);font-weight:500;font-size:22px;font-variant-numeric:tabular-nums}
+.tally span{font-size:12px;color:var(--muted)}
+.tally .bump{animation:bump .6s ease}
+@keyframes bump{40%{color:var(--accent);transform:translateY(-2px)}}
+
+/* shelf */
+.shelf-head{display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between}
+.shelf-head h2{font-family:var(--f-display);font-weight:600;font-size:28px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:0;text-align:left;display:grid;grid-template-rows:auto 1fr;overflow:hidden;transition:transform .2s,border-color .2s}
+.card:hover{transform:translateY(-2px);border-color:var(--muted)}
+.card .pic{position:relative;aspect-ratio:5/4;background:var(--sunk);display:grid;place-items:center;color:var(--ink)}
+.card .pic svg{width:72%;height:auto}
+.card .body{padding:12px 14px 14px;display:grid;gap:8px;align-content:start}
+.card h3{font-size:14px;font-weight:600;line-height:1.3}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.pill{position:absolute;top:10px;left:10px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;letter-spacing:.02em}
+.pill.due{background:var(--warn-soft);color:var(--warn)}
+.pill.over{background:var(--crit-soft);color:var(--crit)}
+.pill.done{background:var(--ok-soft);color:var(--ok)}
+.card.decided .pic>svg,.card.decided .dust{opacity:.25}
+.dust{position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;background-size:160px}
+.agebar{height:6px;background:var(--sunk);border-radius:3px;position:relative;overflow:visible}
+.agebar i{display:block;height:100%;border-radius:3px;background:var(--muted);max-width:100%}
+.agebar.due i{background:var(--warn)} .agebar.over i{background:var(--crit)}
+.agebar::after{content:"";position:absolute;right:0;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.5}
+
+/* decision panel */
+.scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--sunk) 70%,transparent);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px;z-index:10}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(1040px,100%);max-height:calc(100% - 8px);overflow:auto;display:grid;grid-template-columns:1.05fr 1fr;box-shadow:0 30px 80px -30px rgba(0,0,0,.45)}
+.stage{position:relative;background:var(--sunk);min-height:420px;overflow:hidden;display:grid;place-items:center}
+.stage .obj{width:62%;max-width:360px;position:relative;z-index:2;transition:transform 1.4s cubic-bezier(.6,.05,.2,1),opacity 1s ease, filter .6s}
+.stage .obj svg{width:100%;height:auto;display:block}
+.stage .dust{z-index:3}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none}
+.stage .window{position:absolute;inset:14% 12% 20% 12%;border:2px solid var(--ink);border-radius:4px;opacity:0;transition:opacity .8s, box-shadow 1s, background 1s;z-index:1}
+.stage .window::before{content:"";position:absolute;left:-6%;right:-6%;top:-14px;height:10px;background:repeating-linear-gradient(90deg,var(--accent) 0 18px,var(--surface) 18px 36px);border-radius:3px}
+.stage .window.lit{opacity:1;background:radial-gradient(ellipse at 50% 20%,var(--accent-soft),transparent 70%);box-shadow:0 0 60px -10px var(--accent)}
+.stage .tag{position:absolute;z-index:5;right:16%;top:22%;background:var(--accent);color:var(--on-accent);font-family:var(--f-mono);font-size:14px;padding:8px 12px 8px 22px;border-radius:4px 10px 10px 4px;transform-origin:0 50%;opacity:0;transform:translateY(-40px) rotate(-25deg)}
+.stage .tag::before{content:"";position:absolute;left:7px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--surface)}
+.stage .tag.on{animation:swing 1.2s cubic-bezier(.3,1.6,.5,1) forwards}
+@keyframes swing{0%{opacity:0;transform:translateY(-40px) rotate(-25deg)}60%{opacity:1;transform:translateY(0) rotate(8deg)}100%{opacity:1;transform:translateY(0) rotate(-4deg)}}
+.stage .caption{position:absolute;left:16px;bottom:14px;right:16px;z-index:6;display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.stage .stamp{position:absolute;z-index:6;top:16px;left:16px}
+.stage .result{position:absolute;inset:16px 16px auto 16px;z-index:7;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;font-size:14px;opacity:0;transform:translateY(10px);transition:all .5s}
+.stage .result.on{opacity:1;transform:none}
+
+.detail{padding:22px 24px 24px;display:grid;gap:16px;align-content:start;min-width:0}
+.detail-head{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.detail h2{font-family:var(--f-display);font-weight:600;font-size:30px;line-height:1.05}
+.x{border:1px solid var(--line);background:transparent;border-radius:50%;width:34px;height:34px;flex:none;font-size:18px;line-height:1}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px;margin:0}
+.facts dt{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.facts dd{margin:0;font-size:13.5px;font-weight:500}
+.mats{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px}
+.meter{background:var(--sunk);border-radius:var(--r);padding:14px 16px;display:grid;gap:8px}
+.meter .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.counter{font-family:var(--f-mono);font-size:34px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.counter.hot{color:var(--crit)}
+.meter small{color:var(--muted);font-size:12px}
+.status{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px}
+.big-age{height:10px}
+.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.choice{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 10px;display:grid;gap:6px;justify-items:start;text-align:left;position:relative;transition:border-color .2s, background .2s}
+.choice svg{width:22px;height:22px;color:var(--accent)}
+.choice b{font-size:13.5px}
+.choice span{font-size:11.5px;color:var(--muted);line-height:1.35}
+.choice:hover:not(:disabled),.choice[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.choice:disabled{opacity:.5;cursor:not-allowed}
+.choice .sugg{position:absolute;top:-9px;right:8px;background:var(--ink);color:var(--bg);font-size:10px;font-weight:600;letter-spacing:.06em;padding:2px 7px;border-radius:999px;text-transform:uppercase}
+.preview{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px}
+.preview .nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.preview .nums b{font-family:var(--f-mono);font-weight:500;font-size:19px;display:block;font-variant-numeric:tabular-nums}
+.preview .nums span{font-size:11.5px;color:var(--muted)}
+.preview p{margin:0;font-size:13px;color:var(--muted)}
+.confirm-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.note{font-size:11.5px;color:var(--muted);margin:0}
+footer.note{max-width:80ch}
+
+@media (max-width:860px){
+  .panel{grid-template-columns:1fr}
+  .stage{min-height:300px}
+  .tally{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .alert{grid-template-columns:auto 1fr}
+  .alert .btn-primary{grid-column:1/-1}
+}
+@media (max-width:480px){
+  .choices,.preview .nums,.facts{grid-template-columns:1fr 1fr}
+  .counter{font-size:28px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="wordmark">RESOLVE</span>
+      <span class="sub">VM decision desk · <strong>Maison Aurel</strong> (example brand)</span>
+    </div>
+    <div class="tools">
+      <button class="btn" id="soundBtn" aria-pressed="false" title="Sound starts after you click">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path id="wave" d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg>
+        <span>Sound off</span>
+      </button>
+      <button class="btn" id="resetBtn">Reset demo</button>
+    </div>
+  </header>
+
+  <section class="alert" aria-live="polite">
+    <div class="bell"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg></div>
+    <div>
+      <h2 id="alertTitle">3 items reach the 12-month limit within 14 days</h2>
+      <p id="alertText">2 more are already past it. Decide now, or they become RESOLVE property under the 12-month policy.</p>
+    </div>
+    <button class="btn-primary" id="reviewBtn">Review the most urgent</button>
+  </section>
+
+  <section class="tally" aria-label="Impact of decisions made in this session">
+    <div><b id="tDecided">0 / 12</b><span>items decided</span></div>
+    <div><b id="tMoney">$0</b><span>saved or recovered per year</span></div>
+    <div><b id="tSpace">0.0 m²</b><span>warehouse floor freed</span></div>
+    <div><b id="tCo2">0 kg</b><span>CO₂e avoided</span></div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <div class="shelf-head">
+      <div>
+        <div class="eyebrow">Stored at Jebel Ali DC</div>
+        <h2>Your shelf</h2>
+      </div>
+      <div class="filters" role="group" aria-label="Filter items">
+        <button class="btn" data-f="all" aria-pressed="true">All</button>
+        <button class="btn" data-f="urgent" aria-pressed="false">Needs a decision</button>
+        <button class="btn" data-f="done" aria-pressed="false">Decided</button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <footer class="note">Prototype by a DIDI MuW201 student for the Chalhoub RESOLVE brief. All items, costs and the brand are <strong>simulated</strong>. Storage rate assumed at $38 per m³ per month. CO₂e from upcycling uses 1.12 kg per kg diverted, derived from RESOLVE's clean-up figures (37 tCO₂e from 33 t). Embodied-carbon and resale figures are assumptions for illustration.</footer>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="pName">
+    <div class="stage" id="stage">
+      <div class="window" id="win"></div>
+      <div class="obj" id="obj"></div>
+      <div class="dust" id="pDust"></div>
+      <div class="tag" id="tag"></div>
+      <canvas id="fx"></canvas>
+      <span class="stamp pill" id="pStamp"></span>
+      <div class="result" id="result"></div>
+      <div class="caption"><span id="pId" class="mono"></span><span>Time-lapse · 1 second = 1 day in storage</span></div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">
+        <div style="display:grid;gap:4px">
+          <div class="eyebrow" id="pLoc"></div>
+          <h2 id="pName"></h2>
+        </div>
+        <button class="x" id="closeBtn" aria-label="Close">×</button>
+      </div>
+      <dl class="facts" id="facts"></dl>
+      <div style="display:grid;gap:6px">
+        <div class="mats" id="mats"></div>
+        <div class="meta" id="matsLegend" style="justify-content:flex-start;flex-wrap:wrap;gap:4px 12px"></div>
+      </div>
+      <div class="meter">
+        <div class="row"><span class="eyebrow">Storage cost so far</span><span class="status" id="pStatus"></span></div>
+        <div class="counter" id="counter">$0.00</div>
+        <div class="agebar big-age" id="pAge"><i></i></div>
+        <div class="row"><small id="pDays"></small><small>12-month limit</small></div>
+      </div>
+      <div style="display:grid;gap:8px">
+        <div class="eyebrow">What should happen to it?</div>
+        <div class="choices" role="radiogroup" aria-label="Decision" id="choices"></div>
+      </div>
+      <div class="preview" id="preview" aria-live="polite"></div>
+      <div class="confirm-row">
+        <button class="btn-primary" id="confirmBtn" disabled>Choose an option</button>
+        <p class="note" id="ruleNote"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+const RATE = 38;                 // $ per m³ per month (simulated)
+const CO2_DIVERT = 1.12;         // kgCO2e per kg diverted (37 t / 33 t, RESOLVE clean-up)
+const CO2_EMBODIED = 2.0;        // kgCO2e per kg of new fixture avoided (assumption)
+const TODAY = new Date(2026,9,12);
+const MAT = {
+  wood:{label:"Wood / MDF",v:"--wood"}, plastic:{label:"Plastic / acrylic",v:"--plastic"},
+  aluminium:{label:"Aluminium",v:"--aluminium"}, iron:{label:"Steel / iron",v:"--iron"},
+  glass:{label:"Glass",v:"--glass"}, fabric:{label:"Fabric",v:"--fabric"}
+};
+const ITEMS = [
+  {id:"VM-UAE-0412",name:"Lacquered display arch",art:"arch",days:5329,kg:64,vol:2.4,foot:1.2,cond:"C",branded:true,newCost:4200,mats:{wood:.85,fabric:.15},loc:"Bay 14 · Pallet 0412"},
+  {id:"VM-UAE-1187",name:"Travertine-look plinth set (3)",art:"plinths",days:358,kg:48,vol:1.1,foot:.9,cond:"A",branded:false,newCost:1800,mats:{wood:1},loc:"Bay 03 · Pallet 1187"},
+  {id:"VM-UAE-1203",name:"Torso form, matte white",art:"torso",days:352,kg:9,vol:.3,foot:.25,cond:"B",branded:false,newCost:650,mats:{plastic:.8,iron:.2},loc:"Bay 03 · Pallet 1203"},
+  {id:"VM-UAE-1162",name:"Backlit logo lightbox",art:"lightbox",days:361,kg:22,vol:.8,foot:.6,cond:"B",branded:true,newCost:3100,mats:{aluminium:.6,plastic:.4},loc:"Bay 07 · Pallet 1162"},
+  {id:"VM-UAE-0988",name:"Seasonal faux-branch installation",art:"branch",days:401,kg:18,vol:1.6,foot:1.0,cond:"C",branded:false,newCost:1400,mats:{fabric:.55,wood:.45},loc:"Bay 11 · Pallet 0988"},
+  {id:"VM-UAE-1240",name:"Brass hanging rail",art:"rail",days:289,kg:14,vol:.4,foot:.4,cond:"A",branded:false,newCost:900,mats:{iron:1},loc:"Bay 05 · Pallet 1240"},
+  {id:"VM-UAE-1301",name:"Window backdrop panels (4)",art:"panels",days:330,kg:40,vol:1.4,foot:.8,cond:"B",branded:true,newCost:2600,mats:{wood:.7,fabric:.3},loc:"Bay 09 · Pallet 1301"},
+  {id:"VM-UAE-1355",name:"Pedestal, gloss black",art:"pedestal",days:245,kg:20,vol:.5,foot:.35,cond:"B",branded:false,newCost:700,mats:{wood:1},loc:"Bay 02 · Pallet 1355"},
+  {id:"VM-UAE-1402",name:"Bevelled mirror panel",art:"mirror",days:210,kg:26,vol:.4,foot:.3,cond:"B",branded:false,newCost:950,mats:{glass:.8,wood:.2},loc:"Bay 06 · Pallet 1402"},
+  {id:"VM-UAE-1460",name:"Steel gondola shelving",art:"shelving",days:180,kg:55,vol:1.2,foot:.9,cond:"A",branded:false,newCost:2200,mats:{iron:.9,wood:.1},loc:"Bay 12 · Pallet 1460"},
+  {id:"VM-UAE-1517",name:"Round nesting tables (2)",art:"tables",days:120,kg:30,vol:.9,foot:.8,cond:"A",branded:false,newCost:1600,mats:{wood:1},loc:"Bay 04 · Pallet 1517"},
+  {id:"VM-UAE-1588",name:"Acrylic shoe risers (12)",art:"risers",days:64,kg:6,vol:.2,foot:.2,cond:"A",branded:false,newCost:480,mats:{plastic:1},loc:"Bay 01 · Pallet 1588"}
+];
+ITEMS.forEach(i=>{i.baseDays=i.days;i.decision=null});
+
+/* ---------- drawings (line art of each VM item) ---------- */
+const S = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"';
+const F = 'fill="var(--surface)"';
+const ART = {
+  arch:`<path ${S} ${F} d="M40 150V70a60 60 0 01120 0v80h-22V72a38 38 0 00-76 0v78z"/><path ${S} d="M30 150h140"/>`,
+  plinths:`<g ${S} ${F}><path d="M20 150V95h50v55z"/><path d="M20 95l12-10h50l-12 10"/><path d="M82 85v55l-12 10"/><path d="M78 150V65h50v85z"/><path d="M78 65l12-10h50l-12 10"/><path d="M140 55v85l-12 10"/><path d="M136 150v-40h44v40z"/><path d="M136 110l10-8h44l-10 8"/></g>`,
+  torso:`<g ${S}><path ${F} d="M70 30c10-8 50-8 60 0 8 6 10 20 6 36-4 18-8 30-6 52H70c2-22-2-34-6-52-4-16-2-30 6-36z"/><path d="M90 22v-8h20v8"/><path d="M100 118v28M78 150h44"/></g>`,
+  lightbox:`<g ${S}><rect ${F} x="30" y="40" width="140" height="90" rx="4"/><rect x="42" y="52" width="116" height="66" rx="2" stroke-dasharray="3 5"/><text x="100" y="94" text-anchor="middle" font-family="var(--f-display)" font-size="28" fill="currentColor" stroke="none" letter-spacing="6">AUREL</text><path d="M70 130v18M130 130v18M56 150h88"/></g>`,
+  branch:`<g ${S}><path d="M100 150V40M100 110l-34-30M100 90l30-26M100 70l-22-22M100 125l28-18"/><g ${F}><ellipse cx="62" cy="76" rx="10" ry="6"/><ellipse cx="134" cy="60" rx="10" ry="6"/><ellipse cx="74" cy="44" rx="9" ry="5"/><ellipse cx="132" cy="104" rx="9" ry="5"/><ellipse cx="100" cy="36" rx="8" ry="5"/></g><path d="M80 150h40"/></g>`,
+  rail:`<g ${S}><path d="M30 40h140M40 40v110M160 40v110M28 150h24M148 150h24"/><path d="M70 40v16l-14 14h28L70 56M110 40v16l-14 14h28l-14-14M140 40v16" /></g>`,
+  panels:`<g ${S} ${F}><path d="M24 145V45l34-8v100z"/><path d="M62 137V37l38 8v100z"/><path d="M100 145V45l38-8v100z"/><path d="M142 137V37l34 8v100z"/></g>`,
+  pedestal:`<g ${S}><path ${F} d="M74 50h52v96H74z"/><path ${F} d="M66 40h68v10H66zM64 146h72v8H64z"/></g>`,
+  mirror:`<g ${S}><rect ${F} x="60" y="20" width="80" height="128" rx="40"/><rect x="70" y="30" width="60" height="108" rx="30"/><path d="M84 52l20-14M84 70l30-22" opacity=".6"/></g>`,
+  shelving:`<g ${S}><path d="M40 20v130M160 20v130M40 20h120"/><g ${F}><path d="M40 52h120v6H40zM40 88h120v6H40zM40 124h120v6H40z"/></g><path d="M34 150h132"/></g>`,
+  tables:`<g ${S}><ellipse ${F} cx="80" cy="70" rx="56" ry="14"/><path d="M80 84v62M60 150h40"/><ellipse ${F} cx="140" cy="104" rx="38" ry="10"/><path d="M140 114v32M126 150h28"/></g>`,
+  risers:`<g ${S} ${F}><path d="M20 150v-20h40v20zM70 150v-34h40v34zM120 150v-48h40v48z"/><path d="M20 130l8-6h40l-8 6M70 116l8-6h40l-8 6M120 102l8-6h40l-8 6"/></g>`
+};
+const art = k => `<svg viewBox="0 0 200 160" aria-hidden="true">${ART[k]}</svg>`;
+
+/* ---------- dust texture ---------- */
+const dustURL = (()=>{const c=document.createElement('canvas');c.width=c.height=160;const x=c.getContext('2d');
+  for(let i=0;i<900;i++){const r=Math.random()*1.6+.3;x.fillStyle=`rgba(120,100,70,${Math.random()*.55})`;x.beginPath();x.arc(Math.random()*160,Math.random()*160,r,0,7);x.fill();}
+  x.strokeStyle='rgba(120,100,70,.25)';for(let i=0;i<10;i++){x.beginPath();const a=Math.random()*160,b=Math.random()*160;x.moveTo(a,b);x.quadraticCurveTo(a+Math.random()*40-20,b+Math.random()*40-20,a+Math.random()*60-30,b+Math.random()*60-30);x.stroke();}
+  return c.toDataURL();})();
+function ageLook(el,dust,days){
+  const a=Math.min(days/730,1);
+  el.style.filter=`sepia(${a*.7}) saturate(${1-a*.5}) brightness(${1-a*.12})`;
+  if(dust){dust.style.backgroundImage=`url(${dustURL})`;dust.style.opacity=(Math.min(days/365,1)*.32+Math.max(0,Math.min((days-365)/2000,1))*.38).toFixed(2);}
+}
+
+/* ---------- maths ---------- */
+const monthly = i => i.vol*RATE;
+const accrued = i => i.days*monthly(i)/30.4;
+const state = i => i.decision?'done':i.days>=365?'over':i.days>=351?'due':'ok';
+const OPTIONS = {
+  redeploy:{label:"Redeploy",verb:"Redeploy to a store",desc:"Use it in an upcoming window or in-store display.",
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10l2-6h14l2 6M4 10h16v10H4zM9 20v-6h6v6"/></svg>',
+    calc:i=>({money:monthly(i)*12+i.newCost, kg:i.kg, co2:i.kg*CO2_EMBODIED, m2:i.foot}),
+    moneyLabel:"storage + new purchase avoided"},
+  market:{label:"Staff marketplace",verb:"List on staff marketplace",desc:"Sell to Chalhoub staff at under 10% of cost.",
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="8" cy="8" r="1.6"/></svg>',
+    calc:i=>({money:monthly(i)*12+Math.round(i.newCost*.08), kg:i.kg, co2:i.kg*CO2_EMBODIED*.6, m2:i.foot}),
+    moneyLabel:"storage saved + resale"},
+  upcycle:{label:"Upcycle",verb:"Send to upcycling partner",desc:"Break down by material and recycle or upcycle.",
+    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 19H4.8a2 2 0 01-1.7-3l1.6-2.8M11 19h8.2a2 2 0 001.7-3l-1.3-2.2M14 16l-3 3 3 3M8.3 13.3L7 7.8l-5.4 1.5M9.7 5.3l1.6-2.3a2 2 0 013.4 0l4.1 7M16.3 4.6l2.9 5.4 5.3-1.6"/></svg>',
+    calc:i=>({money:monthly(i)*12*.95, kg:i.kg*.95, co2:i.kg*.95*CO2_DIVERT, m2:i.foot}),
+    moneyLabel:"storage saved, minus partner fee"}
+};
+function suggest(i){
+  if(i.cond==="A") return {opt:"redeploy",why:`Condition grade A, so it can go straight back into a store.`};
+  if(i.cond==="B" && !i.branded) return {opt:"market",why:`Grade B and unbranded, so staff can buy and reuse it.`};
+  return {opt:"upcycle",why:i.branded&&i.cond!=="A"?`Branded and grade ${i.cond}, so it can't be resold and isn't fit for a window.`:`Grade ${i.cond}, too worn to reuse as is.`};
+}
+const fmt$ = n => "$"+Math.round(n).toLocaleString("en-US");
+const fmt$c = n => "$"+n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDays = d => d.toLocaleString("en-US")+" days";
+const storedSince = d => {const x=new Date(TODAY);x.setDate(x.getDate()-d);return x.toLocaleDateString("en-GB",{month:"short",year:"numeric"});};
+
+/* ---------- sound (Web Audio, no files) ---------- */
+let ac=null, soundOn=false;
+function tone(f,t0,dur,type="sine",g=.08){if(!soundOn||!ac)return;const o=ac.createOscillator(),v=ac.createGain();o.type=type;o.frequency.value=f;v.gain.setValueAtTime(0,ac.currentTime+t0);v.gain.linearRampToValueAtTime(g,ac.currentTime+t0+.01);v.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+t0+dur);o.connect(v).connect(ac.destination);o.start(ac.currentTime+t0);o.stop(ac.currentTime+t0+dur+.05);}
+function noise(t0,dur,g=.12,freq=900){if(!soundOn||!ac)return;const b=ac.createBuffer(1,ac.sampleRate*dur,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length);const s=ac.createBufferSource(),f=ac.createBiquadFilter(),v=ac.createGain();s.buffer=b;f.type="bandpass";f.frequency.value=freq;v.gain.value=g;s.connect(f).connect(v).connect(ac.destination);s.start(ac.currentTime+t0);}
+const SFX={
+  tick:()=>tone(1800,0,.03,"square",.012),
+  hover:()=>tone(660,0,.08,"sine",.03),
+  alarm:()=>{tone(520,0,.18,"triangle",.06);tone(390,.2,.25,"triangle",.06);},
+  redeploy:()=>[523,659,784,1047].forEach((f,k)=>tone(f,k*.11,.5,"sine",.07)),
+  market:()=>{tone(1318,0,.25,"triangle",.07);tone(1760,.12,.6,"triangle",.07);noise(0,.08,.05,4000);},
+  upcycle:()=>{noise(0,.5,.2,300);tone(80,0,.4,"sine",.15);for(let k=0;k<7;k++)tone(900+Math.random()*1400,.5+k*.09,.15,"sine",.035);}
+};
+const soundBtn=document.getElementById('soundBtn');
+soundBtn.onclick=()=>{try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();ac.resume();}catch(e){}
+  soundOn=!soundOn;soundBtn.setAttribute('aria-pressed',soundOn);soundBtn.querySelector('span').textContent=soundOn?'Sound on':'Sound off';if(soundOn)SFX.hover();};
+
+/* ---------- shelf ---------- */
+const grid=document.getElementById('grid');
+let filter="all";
+function pillFor(i){const s=state(i);
+  if(s==='done')return `<span class="pill done">${OPTIONS[i.decision].label}</span>`;
+  if(s==='over')return `<span class="pill over">Overdue · ${fmtDays(i.days-365)} past limit</span>`;
+  if(s==='due')return `<span class="pill due">Due in ${365-i.days} days</span>`;return "";}
+function renderGrid(){
+  const order={over:0,due:1,ok:2,done:3};
+  const list=[...ITEMS].sort((a,b)=>order[state(a)]-order[state(b)]||b.days-a.days)
+    .filter(i=>filter==="all"||(filter==="done"?i.decision:(!i.decision&&(state(i)==="over"||state(i)==="due"))));
+  grid.innerHTML=list.map(i=>{const s=state(i);return `
+    <button class="card ${i.decision?'decided':''}" data-id="${i.id}" aria-label="${i.name}, ${fmtDays(i.days)} in storage">
+      <div class="pic"><span class="art">${art(i.art)}</span><div class="dust" data-days="${i.days}"></div>${pillFor(i)}</div>
+      <div class="body">
+        <h3>${i.name}</h3>
+        <div class="agebar ${s==='over'?'over':s==='due'?'due':''}"><i style="width:${Math.min(i.days/365*100,100)}%"></i></div>
+        <div class="meta"><span class="mono">${fmtDays(i.days)}</span><span class="mono">${fmt$(monthly(i))}/mo</span></div>
+      </div>
+    </button>`}).join("") || `<p class="note">Nothing here yet.</p>`;
+  grid.querySelectorAll('.card').forEach(c=>{const i=ITEMS.find(x=>x.id===c.dataset.id);ageLook(c.querySelector('.art'),c.querySelector('.dust'),i.decision?0:i.days);c.onclick=()=>openPanel(i);});
+  updateAlert();
+}
+document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll('[data-f]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderGrid();});
+function updateAlert(){
+  const due=ITEMS.filter(i=>state(i)==='due').length, over=ITEMS.filter(i=>state(i)==='over').length;
+  const t=document.getElementById('alertTitle'),p=document.getElementById('alertText');
+  if(!due&&!over){t.textContent="Every item near the limit has a decision";p.textContent="Nice work. The next item reaches 12 months in "+(365-Math.max(...ITEMS.filter(i=>!i.decision).map(i=>i.days),0))+" days.";document.getElementById('reviewBtn').disabled=true;return;}
+  document.getElementById('reviewBtn').disabled=false;
+  t.textContent=due?`${due} item${due>1?'s':''} reach${due>1?'':'es'} the 12-month limit within 14 days`:`${over} item${over>1?'s are':' is'} past the 12-month limit`;
+  p.textContent=(due&&over?`${over} more ${over>1?'are':'is'} already past it. `:"")+"Decide now, or they become RESOLVE property under the 12-month policy.";
+}
+document.getElementById('reviewBtn').onclick=()=>{const order={over:0,due:1};const next=ITEMS.filter(i=>!i.decision&&(state(i)==='due'||state(i)==='over')).sort((a,b)=>order[state(a)]-order[state(b)]||b.days-a.days)[0];if(next)openPanel(next);};
+
+/* ---------- tally ---------- */
+const totals={money:0,kg:0,co2:0,m2:0,n:0};
+function countTo(el,from,to,f){const t0=performance.now(),d=900;el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');
+  (function step(t){const k=Math.min((t-t0)/d,1),e=1-Math.pow(1-k,3);el.textContent=f(from+(to-from)*e);if(k<1)requestAnimationFrame(step);})(t0);}
+function addTotals(r){
+  const prev={...totals};totals.money+=r.money;totals.co2+=r.co2;totals.m2+=r.m2;totals.n++;
+  document.getElementById('tDecided').textContent=`${totals.n} / ${ITEMS.length}`;
+  countTo(document.getElementById('tMoney'),prev.money,totals.money,fmt$);
+  countTo(document.getElementById('tSpace'),prev.m2,totals.m2,v=>v.toFixed(1)+" m²");
+  countTo(document.getElementById('tCo2'),prev.co2,totals.co2,v=>Math.round(v).toLocaleString("en-US")+" kg");
+}
+
+/* ---------- decision panel ---------- */
+const $=id=>document.getElementById(id);
+let cur=null, pick=null, timer=null, busy=false, lastFocus=null, nextItem=null;
+function openPanel(i){
+  if($('scrim').hidden)lastFocus=document.activeElement;cur=i;pick=null;busy=false;nextItem=null;
+  $('scrim').hidden=false;
+  $('obj').innerHTML=art(i.art);$('obj').style.transform="";$('obj').style.opacity=1;
+  $('win').className="window";$('tag').className="tag";$('result').className="result";
+  const cv=$('fx');cv.getContext('2d').clearRect(0,0,cv.width,cv.height);
+  $('pId').textContent=i.id;$('pName').textContent=i.name;$('pLoc').textContent="Jebel Ali DC · "+i.loc;
+  $('facts').innerHTML=[["Stored since",storedSince(i.baseDays)],["Condition",`Grade ${i.cond}`],["Branding",i.branded?"Branded":"Unbranded"],["Volume",i.vol+" m³"],["Weight",i.kg+" kg"],["Storage",fmt$(monthly(i))+"/mo"]].map(([a,b])=>`<div><dt>${a}</dt><dd>${b}</dd></div>`).join("");
+  const m=Object.entries(i.mats);
+  $('mats').innerHTML=m.map(([k,v])=>`<i style="flex:${v};background:var(${MAT[k].v})"></i>`).join("");
+  $('matsLegend').innerHTML=m.map(([k,v])=>`<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(${MAT[k].v});margin-right:5px"></span>${MAT[k].label} ${Math.round(v*100)}%</span>`).join("");
+  const sg=suggest(i);
+  $('choices').innerHTML=Object.entries(OPTIONS).map(([k,o])=>{const blocked=k==="market"&&i.branded;
+    return `<button class="choice" role="radio" aria-checked="false" data-k="${k}" ${blocked||i.decision?'disabled':''}>${k===sg.opt&&!i.decision?'<span class="sugg">Suggested</span>':''}${o.icon}<b>${o.label}</b><span>${blocked?"Not allowed: branded items can't be sold to staff.":o.desc}</span></button>`}).join("");
+  $('ruleNote').textContent=i.decision?"":"Suggestion rule: "+sg.why;
+  $('choices').querySelectorAll('.choice').forEach(b=>{
+    b.onmouseenter=b.onfocus=()=>{if(!b.disabled&&!busy){showPreview(b.dataset.k);SFX.hover();}};
+    b.onclick=()=>{if(busy)return;pick=b.dataset.k;$('choices').querySelectorAll('.choice').forEach(x=>x.setAttribute('aria-checked',x===b));showPreview(pick);const c=$('confirmBtn');c.disabled=false;c.textContent=OPTIONS[pick].verb;};
+  });
+  const cb=$('confirmBtn');cb.disabled=true;cb.textContent=i.decision?"Already decided":"Choose an option";
+  if(i.decision){showDone(i);}else{showPreview(sg.opt,true);}
+  paintMeter();
+  clearInterval(timer);
+  if(!i.decision)timer=setInterval(()=>{if(busy)return;const before=state(cur);cur.days++;paintMeter();SFX.tick();if(before!=='over'&&state(cur)==='over'){SFX.alarm();}},1000);
+  setTimeout(()=>$('closeBtn').focus(),30);
+}
+function paintMeter(){
+  const i=cur,s=state(i);
+  $('counter').textContent=fmt$c(accrued(i));$('counter').classList.toggle('hot',s==='over');
+  const bar=$('pAge');bar.className="agebar big-age "+(s==='over'?'over':s==='due'?'due':'');bar.querySelector('i').style.width=Math.min(i.days/365*100,100)+"%";
+  $('pDays').textContent=fmtDays(i.days)+" in storage"+(i.days>=365?` · ${fmtDays(i.days-365)} past the limit`:` · ${365-i.days} days left`);
+  const st=$('pStatus');
+  if(s==='done'){st.className="status pill done";st.style.position="static";st.textContent="Decided";}
+  else if(s==='over'){st.className="status";st.style.cssText="background:var(--crit-soft);color:var(--crit)";st.textContent="Overdue";}
+  else if(s==='due'){st.className="status";st.style.cssText="background:var(--warn-soft);color:var(--warn)";st.textContent="Due soon";}
+  else{st.className="status";st.style.cssText="background:var(--sunk);color:var(--muted)";st.textContent="Within limit";}
+  $('pStamp').hidden=true;
+  ageLook($('obj'),$('pDust'),i.decision?0:i.days);
+}
+function showPreview(k,isSuggestion){
+  const o=OPTIONS[k],r=o.calc(cur);
+  $('preview').innerHTML=`<div class="eyebrow">${isSuggestion?"Suggested":"If you choose"}: ${o.label}</div>
+    <div class="nums"><div><b>${fmt$(r.money)}</b><span>${o.moneyLabel}</span></div><div><b>${r.m2.toFixed(1)} m²</b><span>floor freed in the DC</span></div><div><b>${Math.round(r.co2)} kg</b><span>CO₂e avoided</span></div></div>
+    <p>Doing nothing costs another <strong>${fmt$(monthly(cur)*12)}</strong> in storage over the next year.</p>`;
+}
+function showDone(i){
+  const o=OPTIONS[i.decision],r=o.calc(i);
+  $('preview').innerHTML=`<div class="eyebrow">Decided: ${o.label}</div><div class="nums"><div><b>${fmt$(r.money)}</b><span>${o.moneyLabel}</span></div><div><b>${r.m2.toFixed(1)} m²</b><span>floor freed</span></div><div><b>${Math.round(r.co2)} kg</b><span>CO₂e avoided</span></div></div>`;
+}
+$('confirmBtn').onclick=()=>{if(nextItem){const n=nextItem;nextItem=null;openPanel(n);return;}
+  if(!pick||busy||cur.decision)return;busy=true;clearInterval(timer);
+  const i=cur,k=pick;i.decision=k;const r=OPTIONS[k].calc(i);
+  $('confirmBtn').disabled=true;$('confirmBtn').textContent="Scheduled";
+  $('choices').querySelectorAll('.choice').forEach(x=>x.disabled=true);
+  ageLook($('obj'),$('pDust'),0);$('pDust').style.transition="opacity 1.2s";$('pDust').style.opacity=0;
+  play(k,i).then(()=>{
+    const pickup=new Date(TODAY);pickup.setDate(pickup.getDate()+3);
+    const where={redeploy:"Dubai Mall flagship, window 2 (spring launch)",market:`staff marketplace at ${fmt$(Math.round(i.newCost*.08))}`,upcycle:"the upcycling partner"}[k];
+    $('result').innerHTML=`<strong>Done.</strong> DC pick-up booked for ${pickup.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}, going to ${where}.`;
+    $('result').classList.add('on');
+    addTotals(r);paintMeter();renderGrid();
+    $('ruleNote').innerHTML="";
+    const next=ITEMS.find(x=>!x.decision&&(state(x)==='over'||state(x)==='due'));
+    const c=$('confirmBtn');
+    if(next){nextItem=next;c.disabled=false;c.textContent="Next urgent item →";}
+    else{c.textContent="All urgent items decided";}
+    busy=false;
+  });
+};
+
+/* ---------- outcome animations ---------- */
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function play(k,i){
+  SFX[k]();
+  const obj=$('obj'),stage=$('stage');
+  if(reduce){obj.style.opacity=k==="upcycle"?0:1;return new Promise(r=>setTimeout(r,200));}
+  if(k==="redeploy"){
+    $('win').classList.add('lit');
+    obj.style.transform="scale(.66) translateY(4%)";
+    return new Promise(r=>setTimeout(r,1500));
+  }
+  if(k==="market"){
+    $('tag').textContent=fmt$(Math.round(i.newCost*.08));$('tag').classList.add('on');
+    return new Promise(r=>setTimeout(()=>{obj.style.transform="translate(40%,-30%) scale(.5) rotate(6deg)";obj.style.opacity=.0;setTimeout(r,1100);},1100));
+  }
+  // upcycle: particles split into material bins
+  return new Promise(res=>{
+    const cv=$('fx'),rect=stage.getBoundingClientRect(),dpr=devicePixelRatio||1;
+    cv.width=rect.width*dpr;cv.height=rect.height*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);
+    const W=rect.width,H=rect.height,o=obj.getBoundingClientRect();
+    const mats=Object.entries(i.mats),css=getComputedStyle(document.documentElement);
+    const ink=css.getPropertyValue('--ink').trim(),muted=css.getPropertyValue('--muted').trim();
+    const binW=Math.min(110,(W-40)/mats.length-12),gap=(W-binW*mats.length)/(mats.length+1);
+    const bins=mats.map(([m,v],n)=>({m,v,x:gap+n*(binW+gap),col:css.getPropertyValue(MAT[m].v).trim(),fill:0}));
+    const P=[];const N=520;
+    for(let n=0;n<N;n++){let acc=0,r=Math.random(),b=bins[0];for(const bb of bins){acc+=bb.v;if(r<=acc){b=bb;break;}}
+      const px=o.left-rect.left+Math.random()*o.width,py=o.top-rect.top+Math.random()*o.height;
+      P.push({x:px,y:py,vx:(Math.random()-.5)*7,vy:(Math.random()-.9)*7,b,tx:b.x+6+Math.random()*(binW-12),s:Math.random()*2.2+1.2,done:false,delay:Math.random()*25});}
+    obj.style.transition="opacity .25s";obj.style.opacity=0;
+    const binTop=H-118,binBot=H-80;let f=0;
+    (function frame(){f++;x.clearRect(0,0,W,H);
+      bins.forEach(b=>{x.strokeStyle=muted;x.lineWidth=1.5;x.beginPath();x.moveTo(b.x,binTop);x.lineTo(b.x+4,binBot);x.lineTo(b.x+binW-4,binBot);x.lineTo(b.x+binW,binTop);x.stroke();
+        const h=Math.min(b.fill/N*60/b.v*b.v*1.0,32);x.fillStyle=b.col;x.globalAlpha=.85;x.fillRect(b.x+5,binBot-1-h,binW-10,h);x.globalAlpha=1;
+        x.fillStyle=ink;x.font="600 11px IBM Plex Sans, system-ui";x.textAlign="center";x.fillText(MAT[b.m].label,b.x+binW/2,binBot+18);
+        x.fillStyle=muted;x.font="11px IBM Plex Mono, monospace";x.fillText((i.kg*b.v).toFixed(1)+" kg",b.x+binW/2,binBot+33);});
+      let live=0;
+      P.forEach(p=>{if(p.done)return;live++;
+        if(f<35){p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.vx*=.97;}
+        else if(f-35>p.delay){p.x+=(p.tx-p.x)*.08;p.y+=(binTop+8-p.y)*.08;if(Math.abs(p.y-(binTop+8))<3){p.done=true;p.b.fill++;}}
+        else{p.x+=p.vx*.3;p.y+=p.vy*.3;p.vy+=.05;}
+        x.fillStyle=p.b.col;x.fillRect(p.x,p.y,p.s,p.s);});
+      if(live&&f<400)requestAnimationFrame(frame);else{res();}
+    })();
+  });
+}
+
+/* ---------- close / reset ---------- */
+function close(){clearInterval(timer);$('scrim').hidden=true;nextItem=null;renderGrid();lastFocus&&lastFocus.focus&&lastFocus.focus();}
+$('closeBtn').onclick=close;
+$('scrim').addEventListener('click',e=>{if(e.target.id==='scrim'&&!busy)close();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('scrim').hidden&&!busy)close();});
+$('resetBtn').onclick=()=>{ITEMS.forEach(i=>{i.days=i.baseDays;i.decision=null});Object.assign(totals,{money:0,kg:0,co2:0,m2:0,n:0});
+  ['tMoney','tSpace','tCo2'].forEach((id,n)=>$(id).textContent=["$0","0.0 m²","0 kg"][n]);$('tDecided').textContent=`0 / ${ITEMS.length}`;renderGrid();};
+renderGrid();
+})();
+</script>
+
+</body>
+</html>
